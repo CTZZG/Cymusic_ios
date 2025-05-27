@@ -1,6 +1,6 @@
 
-import {GlobalState} from '@/utils/stateMapper';
-import PersistStatus from '@/store/PersistStatus'
+import PersistStatus from '@/store/PersistStatus';
+import { GlobalState } from '@/utils/stateMapper';
 
 /** 音乐队列 */
 const trackViewList = new GlobalState<IMusic.IMusicItem[]>([]);
@@ -31,7 +31,7 @@ export function setTrackViewList(
     });
     playListIndexMap = newIndexMap;
     if (shouldSave) {
-        PersistStatus.set('music.playList', newPlayList);
+        PersistStatus.set('music.play-list', newPlayList);
     }
 }
 

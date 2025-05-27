@@ -1,7 +1,7 @@
 import { FloatingPlayer } from '@/components/FloatingPlayer'
 import { colors, fontSize } from '@/constants/tokens'
 import i18n, { nowLanguage } from '@/utils/i18n'
-import { FontAwesome, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'
+import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons'
 import { BlurView } from 'expo-blur'
 import { Tabs } from 'expo-router'
 import React from 'react'
@@ -41,17 +41,17 @@ const TabsNavigation = () => {
 				<Tabs.Screen
 					name="(songs)"
 					options={{
-						title: i18n.t('appTab.songs'),
+						title: '排行榜',
 						tabBarIcon: ({ color }) => (
-							<Ionicons name="musical-notes-sharp" size={24} color={color} />
+							<MaterialCommunityIcons name="trophy" size={24} color={color} />
 						),
 					}}
 				/>
 				<Tabs.Screen
 					name="radio"
 					options={{
-						title: i18n.t('appTab.radio'),
-						tabBarIcon: ({ color }) => <Ionicons name="radio" size={24} color={color} />,
+						title: '歌单',
+						tabBarIcon: ({ color }) => <MaterialCommunityIcons name="playlist-music" size={24} color={color} />,
 					}}
 				/>
 				<Tabs.Screen

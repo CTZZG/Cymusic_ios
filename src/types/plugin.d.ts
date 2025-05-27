@@ -154,9 +154,31 @@ declare namespace IPlugin {
         enabled?: boolean;
     };
 
-    /** 歌词源 */
-    export interface ILyricSource {
-        rawLrc?: string;
-        translation?: string;
+    /** 插件状态枚举 */
+    export enum PluginState {
+        Loading = 'loading',
+        Mounted = 'mounted',
+        Error = 'error',
+    }
+
+    /** 插件错误原因枚举 */
+    export enum PluginErrorReason {
+        CannotParse = 'cannot-parse',
+        VersionNotMatch = 'version-not-match',
+        Unknown = 'unknown',
+    }
+
+    /** 插件安装配置 */
+    export interface IInstallPluginConfig {
+        notCheckVersion?: boolean;
+    }
+
+    /** 插件安装结果 */
+    export interface IInstallPluginResult {
+        success: boolean;
+        message?: string;
+        pluginName?: string;
+        pluginHash?: string;
+        pluginUrl?: string;
     }
 }

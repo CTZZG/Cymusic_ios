@@ -7,25 +7,60 @@ import { GlobalState } from '@/utils/stateMapper'
 import * as FileSystem from 'expo-file-system'
 import { produce } from 'immer'
 import shuffle from 'lodash.shuffle'
-import RNFS from 'react-native-fs'
+// import RNFS from 'react-native-fs' // 注释掉以避免Web环境错误
+import { Platform } from 'react-native'
 import ReactNativeTrackPlayer, {
-	Event,
-	State,
-	Track,
-	usePlaybackState,
-	useProgress,
+    Event,
+    State,
+    Track,
+    usePlaybackState,
+    useProgress,
 } from 'react-native-track-player'
+
+// 平台兼容的文件系统工具
+const createPlatformFS = () => {
+	if (Platform.OS === 'web') {
+		// Web环境的模拟实现
+		return {
+			exists: async (path: string) => {
+				// Web环境中总是返回true，避免错误
+				console.warn('RNFS.exists called in web environment:', path)
+				return true
+			},
+			downloadFile: (options: any) => ({
+				promise: Promise.resolve({ statusCode: 200 })
+			})
+		}
+	} else {
+		// 原生环境动态导入RNFS
+		try {
+			const RNFS = require('react-native-fs')
+			return RNFS
+		} catch (error) {
+			console.warn('react-native-fs not available:', error)
+			// 降级实现
+			return {
+				exists: async (path: string) => false,
+				downloadFile: (options: any) => ({
+					promise: Promise.reject(new Error('RNFS not available'))
+				})
+			}
+		}
+	}
+}
+
+const RNFS = createPlatformFS()
 
 import { MusicRepeatMode } from '@/helpers/types'
 import PersistStatus from '@/store/PersistStatus'
 import {
-	getMusicIndex,
-	getPlayList,
-	getPlayListMusicAt,
-	isInPlayList,
-	isPlayListEmpty,
-	setPlayList,
-	usePlayList,
+    getMusicIndex,
+    getPlayList,
+    getPlayListMusicAt,
+    isInPlayList,
+    isPlayListEmpty,
+    setPlayList,
+    usePlayList,
 } from '@/store/playList'
 import { createMediaIndexMap } from '@/utils/mediaIndexMap'
 import { musicIsPaused } from '@/utils/trackUtils'
@@ -46,7 +81,7 @@ export const playListsStore = new GlobalState<IMusic.PlayList[] | []>(null)
 export const repeatModeStore = new GlobalState<MusicRepeatMode>(MusicRepeatMode.QUEUE)
 
 /** 音质 */
-export const qualityStore = new GlobalState<IMusic.IQualityKey>('128k')
+export const qualityStore = new GlobalState<IMusic.IQualityKey>('128k' as IMusic.IQualityKey)
 /** 音源 */
 export const musicApiStore = new GlobalState<IMusic.MusicApi[] | []>(null)
 /** 当前音源 */
@@ -865,7 +900,7 @@ const play = async (musicItem?: IMusic.IMusicItem | null, forcePlay?: boolean) =
 							setTimeout(() => reject(new Error('请求超时')), 5000)
 						})
 						// 定义音质降级顺序
-						const qualityOrder: IMusic.IQualityKey[] = ['flac', '320k', '128k']
+						const qualityOrder: IMusic.IQualityKey[] = ['flac' as IMusic.IQualityKey, '320k' as IMusic.IQualityKey, '128k' as IMusic.IQualityKey]
 						let currentQualityIndex = qualityOrder.indexOf(qualityStore.getValue())
 
 						// 尝试不同音质，直到获取到可用的URL或尝试完所有音质
@@ -1247,7 +1282,7 @@ const ensureDirExists = async (dirPath: string) => {
  * @returns 本地文件路径
  */
 const getLocalFilePath = (musicItem: IMusic.IMusicItem): string => {
-	const format = qualityStore.getValue() === 'flac' ? 'flac' : 'mp3'
+	const format = qualityStore.getValue() === ('flac' as IMusic.IQualityKey) ? 'flac' : 'mp3'
 	return `${cacheDir}${musicItem.title}-${musicItem.artist}.${format}`
 }
 
@@ -1383,3 +1418,4 @@ const myTrackPlayer = {
 
 export default myTrackPlayer
 export { MusicRepeatMode, State as MusicState }
+

@@ -4,8 +4,7 @@ import LyricManager from '@/helpers/lyricManager'
 import { useLogTrackPlayerState } from '@/hooks/useLogTrackPlayerState'
 import { useSetupTrackPlayer } from '@/hooks/useSetupTrackPlayer'
 import i18n, { setI18nConfig } from '@/utils/i18n'
-import { router, SplashScreen, Stack } from 'expo-router'
-import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent'
+import { SplashScreen, Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useCallback, useEffect, useState } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
@@ -16,7 +15,7 @@ SplashScreen.preventAutoHideAsync()
 
 TrackPlayer.registerPlaybackService(() => playbackService)
 setI18nConfig()
-const App = () => {
+const AppContent = () => {
 	const handleTrackPlayerLoaded = useCallback(() => {
 		setTimeout(SplashScreen.hideAsync, 1500)
 	}, [])
@@ -29,23 +28,11 @@ const App = () => {
 	// myTrackPlayer.setupTrackPlayer()
 
 	LyricManager.setup()
-
-	// 初始化插件系统
-	useEffect(() => {
-		const initPluginSystem = async () => {
-			try {
-				console.log('🔌 开始初始化插件系统...')
-				await PluginManager.setup()
-				console.log('✅ 插件系统初始化完成')
-			} catch (error) {
-				console.error('❌ 插件系统初始化失败:', error)
-			}
-		}
-		initPluginSystem()
-	}, [])
-
 	const [isI18nReady, setIsI18nReady] = useState(false)
-	const { hasShareIntent } = useShareIntentContext()
+	const [isPluginSystemReady, setIsPluginSystemReady] = useState(false)
+	// 暂时注释掉ShareIntent相关功能以避免React钩子问题
+	// const { hasShareIntent } = useShareIntentContext()
+	const hasShareIntent = false
 
 	useEffect(() => {
 		if (hasShareIntent) {
@@ -67,6 +54,25 @@ const App = () => {
 		}
 
 		initI18n()
+	}, [])
+
+	useEffect(() => {
+		const initPluginSystem = async () => {
+			try {
+				console.log('开始初始化插件系统...')
+				// 动态导入bootstrap函数
+				const { bootstrap } = await import('@/core/pluginManager')
+				await bootstrap()
+				setIsPluginSystemReady(true)
+				console.log('插件系统初始化完成')
+			} catch (error) {
+				console.error('插件系统初始化失败:', error)
+				// 即使插件系统初始化失败，也要设置为ready，不阻止应用启动
+				setIsPluginSystemReady(true)
+			}
+		}
+
+		initPluginSystem()
 	}, [])
 	const toastConfig = {
 		/*
@@ -120,26 +126,19 @@ const App = () => {
 	*/
 	}
 	return (
-		<ShareIntentProvider
-			options={{
-				debug: true,
-				resetOnBackground: true,
-				onResetShareIntent: () =>
-					// used when app going in background and when the reset button is pressed
-					router.replace({
-						pathname: '/',
-					}),
-			}}
-		>
-			<SafeAreaProvider>
-				<GestureHandlerRootView style={{ flex: 1 }}>
-					<RootNavigation />
-					<StatusBar style="auto" />
-					<Toast config={toastConfig} />
-				</GestureHandlerRootView>
-			</SafeAreaProvider>
-		</ShareIntentProvider>
+		<SafeAreaProvider>
+			<GestureHandlerRootView style={{ flex: 1 }}>
+				<RootNavigation />
+				<StatusBar style="auto" />
+				<Toast config={toastConfig} />
+			</GestureHandlerRootView>
+		</SafeAreaProvider>
 	)
+}
+
+const App = () => {
+	// 暂时简化ShareIntentProvider配置以避免React钩子问题
+	return <AppContent />
 }
 
 const RootNavigation = () => {
@@ -227,13 +226,20 @@ const RootNavigation = () => {
 				name="(modals)/pluginTest"
 				options={{
 					presentation: 'modal',
-					headerShown: false,
+					headerShown: true,
 					gestureEnabled: true,
 					gestureDirection: 'vertical',
+					headerTitle: '插件系统测试',
+					headerStyle: {
+						backgroundColor: colors.background,
+					},
+					headerTitleStyle: {
+						color: colors.text,
+					},
 				}}
 			/>
 			<Stack.Screen
-				name="(modals)/uiTest"
+				name="(modals)/topListDetail"
 				options={{
 					presentation: 'modal',
 					headerShown: false,
@@ -242,7 +248,7 @@ const RootNavigation = () => {
 				}}
 			/>
 			<Stack.Screen
-				name="(modals)/pluginManage"
+				name="(modals)/sheetDetail"
 				options={{
 					presentation: 'modal',
 					headerShown: false,

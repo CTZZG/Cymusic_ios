@@ -14,5 +14,5 @@ declare namespace IArtist {
         [k: string]: any;
     }
 
-    export type ArtistMediaType = 'music' | 'album';
+    export type ArtistMediaType = IArtist.ArtistMediaType;
 }

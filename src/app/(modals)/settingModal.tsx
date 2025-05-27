@@ -32,7 +32,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native'
-import RNFS from 'react-native-fs'
+// import RNFS from 'react-native-fs' // 注释掉以避免Web环境错误
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Toast, { BaseToast, ErrorToast } from 'react-native-toast-message'
 const QUALITY_OPTIONS = ['128k', '320k', 'flac']
@@ -390,7 +390,8 @@ const importMusicSourceFromFile = async () => {
 
 		// logInfo('File selected:', result.assets[0].uri)
 		const fileUri = decodeURIComponent(result.assets[0].uri)
-		const fileContents = await RNFS.readFile(fileUri, 'utf8')
+		// 使用FileSystem替代RNFS以支持Web环境
+		const fileContents = await FileSystem.readAsStringAsync(fileUri)
 		logInfo('File contents:', fileContents)
 		// 模拟 Node.js 的模块系统
 		const module: { exports: ModuleExports } = { exports: {} }
@@ -439,6 +440,7 @@ const SettingModal = () => {
 				{ id: '5', title: i18n.t('settings.items.projectLink'), type: 'value', value: '' },
 				{ id: '9', title: i18n.t('settings.items.clearCache'), type: 'value', value: '' },
 				{ id: '13', title: i18n.t('settings.items.viewLogs'), type: 'link' },
+				{ id: '18', title: '插件系统测试', type: 'link' },
 				{
 					id: '15',
 					title: i18n.t('settings.items.changeLanguage'),
@@ -486,14 +488,6 @@ const SettingModal = () => {
 			title: i18n.t('settings.sections.qualitySelection'),
 			data: [{ id: '10', title: i18n.t('settings.items.currentQuality'), type: 'value' }],
 		},
-		{
-			title: '插件系统',
-			data: [
-				{ id: '20', title: '插件管理', type: 'link' },
-				{ id: '18', title: '插件系统测试', type: 'link' }
-			],
-		},
-
 	]
 	const importMusicSourceMenu = (
 		<MenuView
@@ -708,8 +702,6 @@ const SettingModal = () => {
 						router.push('/(modals)/logScreen')
 					} else if (item.title === '插件系统测试') {
 						router.push('/(modals)/pluginTest')
-					} else if (item.title === '插件管理') {
-						router.push('/(modals)/pluginManage')
 					}
 					if (item.title === i18n.t('settings.items.projectLink')) {
 						Linking.openURL('https://github.com/gyc-12/Cymusic').catch((err) =>

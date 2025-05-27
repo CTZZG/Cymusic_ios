@@ -220,24 +220,4 @@ declare namespace IMusic {
     export interface IMusicItemCache extends IMusicItem {
         $localLyric?: ILyric.ILyricSource;
     }
-
-    /** 歌单基础信息 */
-    export interface IMusicSheetItemBase extends ICommon.IMediaBase {
-        title: string;
-        artwork?: string;
-        description?: string;
-        artist?: string;
-        worksNum?: number;
-    }
-
-    /** 歌单信息 */
-    export interface IMusicSheetItem extends IMusicSheetItemBase {
-        musicList?: IMusicItem[];
-    }
-
-    /** 歌单分组 */
-    export interface IMusicSheetGroupItem {
-        title: string;
-        data: IMusicSheetItemBase[];
-    }
 }

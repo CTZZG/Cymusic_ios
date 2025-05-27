@@ -1,148 +1,195 @@
-import { PluginManager } from '@/core/pluginManager';
-import { testPluginSystem } from '@/core/pluginManager/test';
-import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { colors } from '@/constants/tokens';
+import pluginManager from '@/core/pluginManager';
+import { getPluginSystemStatus } from '@/core/bootstrap';
 
 export default function PluginTestScreen() {
-    const [plugins, setPlugins] = useState<any[]>([]);
-    const [testResults, setTestResults] = useState<string[]>([]);
+    const [pluginStatus, setPluginStatus] = useState<any>(null);
+    const [testResults, setTestResults] = useState<any[]>([]);
 
     useEffect(() => {
-        loadPlugins();
+        loadPluginStatus();
     }, []);
 
-    const loadPlugins = () => {
-        const allPlugins = PluginManager.getPlugins();
-        setPlugins(allPlugins);
+    const loadPluginStatus = () => {
+        const status = getPluginSystemStatus();
+        setPluginStatus(status);
     };
 
-    const runPluginTest = async () => {
-        setTestResults(['开始测试插件系统...']);
-
+    const testPluginSearch = async () => {
         try {
-            const success = await testPluginSystem();
-            if (success) {
-                setTestResults(prev => [...prev, '✅ 插件系统测试通过！']);
-            } else {
-                setTestResults(prev => [...prev, '❌ 插件系统测试失败！']);
+            const plugins = pluginManager.getEnabledPlugins();
+            const results = [];
+
+            for (const plugin of plugins) {
+                if (plugin.methods.search) {
+                    try {
+                        const searchResult = await plugin.methods.search('测试', 1, 'music');
+                        results.push({
+                            plugin: plugin.name,
+                            type: 'search',
+                            success: true,
+                            data: searchResult,
+                        });
+                    } catch (error) {
+                        results.push({
+                            plugin: plugin.name,
+                            type: 'search',
+                            success: false,
+                            error: error.message,
+                        });
+                    }
+                }
             }
+
+            setTestResults(results);
         } catch (error) {
-            setTestResults(prev => [...prev, `❌ 测试出错: ${error.message}`]);
+            console.error('测试插件搜索失败:', error);
         }
     };
 
-    const installTestPlugin = async () => {
-        const testPluginCode = `
-module.exports = {
-    platform: "测试音源",
-    version: "1.0.0",
-    author: "Cymusic",
-    async search(query, page, type) {
-        return {
-            isEnd: false,
-            data: [
-                {
-                    id: "test_" + Date.now(),
-                    title: "测试歌曲 - " + query,
-                    artist: "测试歌手",
-                    platform: "测试音源",
-                    duration: 180,
-                    album: "测试专辑",
-                    artwork: ""
-                }
-            ]
-        };
-    },
-    async getMediaSource(musicItem, quality) {
-        return {
-            url: "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav"
-        };
-    }
-};
-        `;
-
+    const testPluginTopLists = async () => {
         try {
-            // 直接使用插件代码创建插件，而不是从文件安装
-            const { Plugin } = await import('@/core/pluginManager/plugin');
-            const plugin = new Plugin(testPluginCode, 'test-plugin.js');
+            const plugins = pluginManager.getEnabledPlugins();
+            const results = [];
 
-            if (plugin.state === 'mounted') {
-                // 手动添加到插件管理器
-                const currentPlugins = PluginManager.getPlugins();
-                const existingIndex = currentPlugins.findIndex(p => p.name === plugin.name);
-
-                if (existingIndex !== -1) {
-                    currentPlugins[existingIndex] = plugin;
-                } else {
-                    currentPlugins.push(plugin);
+            for (const plugin of plugins) {
+                if (plugin.methods.getTopLists) {
+                    try {
+                        const topLists = await plugin.methods.getTopLists();
+                        results.push({
+                            plugin: plugin.name,
+                            type: 'topLists',
+                            success: true,
+                            data: topLists,
+                        });
+                    } catch (error) {
+                        results.push({
+                            plugin: plugin.name,
+                            type: 'topLists',
+                            success: false,
+                            error: error.message,
+                        });
+                    }
                 }
-
-                PluginManager.setPlugins(currentPlugins);
-
-                Alert.alert('成功', `插件 "${plugin.name}" 安装成功！`);
-                loadPlugins();
-            } else {
-                Alert.alert('失败', '插件创建失败');
             }
 
+            setTestResults(results);
         } catch (error) {
-            Alert.alert('错误', `安装失败: ${error.message}`);
+            console.error('测试插件榜单失败:', error);
+        }
+    };
+
+    const testPluginRecommendSheets = async () => {
+        try {
+            const plugins = pluginManager.getEnabledPlugins();
+            const results = [];
+
+            for (const plugin of plugins) {
+                if (plugin.methods.getRecommendSheetTags) {
+                    try {
+                        const sheetTags = await plugin.methods.getRecommendSheetTags();
+                        results.push({
+                            plugin: plugin.name,
+                            type: 'recommendSheets',
+                            success: true,
+                            data: sheetTags,
+                        });
+                    } catch (error) {
+                        results.push({
+                            plugin: plugin.name,
+                            type: 'recommendSheets',
+                            success: false,
+                            error: error.message,
+                        });
+                    }
+                }
+            }
+
+            setTestResults(results);
+        } catch (error) {
+            console.error('测试插件推荐歌单失败:', error);
         }
     };
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Text style={styles.backButtonText}>← 返回</Text>
-                </TouchableOpacity>
+            <ScrollView style={styles.scrollView}>
                 <Text style={styles.title}>插件系统测试</Text>
-            </View>
 
-            <ScrollView style={styles.content}>
+                {/* 插件状态 */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>已安装插件 ({plugins.length})</Text>
-                    {plugins.length === 0 ? (
-                        <Text style={styles.emptyText}>暂无插件</Text>
+                    <Text style={styles.sectionTitle}>插件状态</Text>
+                    {pluginStatus ? (
+                        <View>
+                            <Text style={styles.text}>
+                                总插件数: {pluginStatus.totalPlugins}
+                            </Text>
+                            <Text style={styles.text}>
+                                已启用插件数: {pluginStatus.enabledPlugins}
+                            </Text>
+                            {pluginStatus.plugins.map((plugin: any, index: number) => (
+                                <View key={index} style={styles.pluginItem}>
+                                    <Text style={styles.pluginName}>{plugin.name}</Text>
+                                    <Text style={styles.pluginState}>
+                                        状态: {plugin.state} | 
+                                        启用: {plugin.enabled ? '是' : '否'}
+                                    </Text>
+                                </View>
+                            ))}
+                        </View>
                     ) : (
-                        plugins.map((plugin, index) => (
-                            <View key={index} style={styles.pluginItem}>
-                                <Text style={styles.pluginName}>{plugin.name}</Text>
-                                <Text style={styles.pluginInfo}>
-                                    版本: {plugin.instance.version || '未知'} |
-                                    状态: {plugin.state} |
-                                    作者: {plugin.instance.author || '未知'}
+                        <Text style={styles.text}>加载中...</Text>
+                    )}
+                </View>
+
+                {/* 测试按钮 */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>功能测试</Text>
+                    <TouchableOpacity style={styles.button} onPress={testPluginSearch}>
+                        <Text style={styles.buttonText}>测试搜索功能</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.button} onPress={testPluginTopLists}>
+                        <Text style={styles.buttonText}>测试榜单功能</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.button} onPress={testPluginRecommendSheets}>
+                        <Text style={styles.buttonText}>测试推荐歌单功能</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* 测试结果 */}
+                {testResults.length > 0 && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>测试结果</Text>
+                        {testResults.map((result, index) => (
+                            <View key={index} style={styles.resultItem}>
+                                <Text style={styles.resultPlugin}>
+                                    插件: {result.plugin}
                                 </Text>
+                                <Text style={styles.resultType}>
+                                    类型: {result.type}
+                                </Text>
+                                <Text style={[
+                                    styles.resultStatus,
+                                    { color: result.success ? 'green' : 'red' }
+                                ]}>
+                                    状态: {result.success ? '成功' : '失败'}
+                                </Text>
+                                {result.success ? (
+                                    <Text style={styles.resultData}>
+                                        数据: {JSON.stringify(result.data, null, 2)}
+                                    </Text>
+                                ) : (
+                                    <Text style={styles.resultError}>
+                                        错误: {result.error}
+                                    </Text>
+                                )}
                             </View>
-                        ))
-                    )}
-                </View>
-
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>测试操作</Text>
-                    <TouchableOpacity style={styles.button} onPress={runPluginTest}>
-                        <Text style={styles.buttonText}>运行插件系统测试</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.button} onPress={installTestPlugin}>
-                        <Text style={styles.buttonText}>安装测试插件</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.button} onPress={loadPlugins}>
-                        <Text style={styles.buttonText}>刷新插件列表</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>测试结果</Text>
-                    {testResults.length === 0 ? (
-                        <Text style={styles.emptyText}>暂无测试结果</Text>
-                    ) : (
-                        testResults.map((result, index) => (
-                            <Text key={index} style={styles.testResult}>{result}</Text>
-                        ))
-                    )}
-                </View>
+                        ))}
+                    </View>
+                )}
             </ScrollView>
         </SafeAreaView>
     );
@@ -151,79 +198,96 @@ module.exports = {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: colors.background,
     },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e0e0e0',
-    },
-    backButton: {
-        marginRight: 16,
-    },
-    backButtonText: {
-        fontSize: 16,
-        color: '#007AFF',
-    },
-    title: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    content: {
+    scrollView: {
         flex: 1,
         padding: 16,
     },
+    title: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: colors.text,
+        marginBottom: 20,
+        textAlign: 'center',
+    },
     section: {
-        backgroundColor: '#fff',
-        borderRadius: 8,
+        marginBottom: 24,
         padding: 16,
-        marginBottom: 16,
+        backgroundColor: colors.background,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     sectionTitle: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: 'bold',
-        color: '#333',
+        color: colors.text,
         marginBottom: 12,
     },
-    emptyText: {
-        color: '#999',
-        fontStyle: 'italic',
+    text: {
+        fontSize: 14,
+        color: colors.text,
+        marginBottom: 8,
     },
     pluginItem: {
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
-        paddingVertical: 8,
+        marginBottom: 12,
+        padding: 8,
+        backgroundColor: colors.background,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: colors.border,
     },
     pluginName: {
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: 'bold',
-        color: '#333',
+        color: colors.text,
     },
-    pluginInfo: {
+    pluginState: {
         fontSize: 12,
-        color: '#666',
-        marginTop: 4,
+        color: colors.textMuted,
     },
     button: {
-        backgroundColor: '#007AFF',
-        borderRadius: 8,
+        backgroundColor: colors.primary,
         padding: 12,
+        borderRadius: 8,
         marginBottom: 8,
-        alignItems: 'center',
     },
     buttonText: {
-        color: '#fff',
-        fontSize: 14,
+        color: 'white',
+        textAlign: 'center',
         fontWeight: 'bold',
     },
-    testResult: {
+    resultItem: {
+        marginBottom: 16,
+        padding: 12,
+        backgroundColor: colors.background,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    resultPlugin: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: colors.text,
+    },
+    resultType: {
         fontSize: 12,
-        color: '#333',
-        marginBottom: 4,
+        color: colors.textMuted,
+    },
+    resultStatus: {
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    resultData: {
+        fontSize: 10,
+        color: colors.textMuted,
+        marginTop: 4,
         fontFamily: 'monospace',
+    },
+    resultError: {
+        fontSize: 12,
+        color: 'red',
+        marginTop: 4,
     },
 });

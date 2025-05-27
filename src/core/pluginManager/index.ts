@@ -1,84 +1,37 @@
-/**
- * 插件管理器
- * 负责插件的加载、安装、卸载、管理等功能
- */
-
-import { errorLog, trace } from '@/utils/logger';
-import axios from 'axios';
-import { compare } from 'compare-versions';
-import { readAsStringAsync } from 'expo-file-system';
-import { ToastAndroid } from 'react-native';
-import { exists, mkdir, readFile, readdir } from 'react-native-fs';
-import { Plugin, PluginState, localFilePlugin, localPluginHash, localPluginPlatform } from './plugin';
+import { pathConst } from '@/constants/pathConst';
+import { EventEmitter } from 'events';
+import { Plugin } from './plugin';
 import { pluginMeta } from './pluginMeta';
-// 类型引用通过全局声明，不需要import
-import { EventEmitter } from 'eventemitter3';
 
-export interface IInstallPluginConfig {
-    notCheckVersion?: boolean;
-}
-
-export interface IInstallPluginResult {
-    success: boolean;
-    message: string;
-    pluginName: string;
-    pluginHash: string;
-    pluginUrl?: string;
-}
-
-export interface IPluginManager {
-    setup(): Promise<void>;
-    installPluginFromLocalFile(
-        pluginPath: string,
-        config?: IInstallPluginConfig & { useExpoFs?: boolean }
-    ): Promise<IInstallPluginResult>;
-    installPluginFromUrl(
-        url: string,
-        config?: IInstallPluginConfig
-    ): Promise<IInstallPluginResult>;
-    uninstallPlugin(hash: string): Promise<void>;
-    uninstallAllPlugins(): Promise<void>;
-    updatePlugin(plugin: Plugin): Promise<void>;
-    getByMedia(mediaItem: ICommon.IMediaBase): Plugin | undefined;
-    getByName(name: string): Plugin | undefined;
-    getByHash(hash: string): Plugin | undefined;
-    getPlugins(): Plugin[];
-    getValidPlugins(): Plugin[];
-    getPluginsWithAbility(ability: keyof IPlugin.IPluginInstanceMethods): Plugin[];
-    getSortedPluginsWithAbility(ability: keyof IPlugin.IPluginInstanceMethods): Plugin[];
-    setPluginEnabled(plugin: Plugin, enabled: boolean): void;
-    isPluginEnabled(plugin: Plugin): boolean;
-    setPlugins(plugins: Plugin[]): void;
-}
-
-class PluginManagerImpl implements IPluginManager {
+/**
+ * 插件管理器类
+ * 负责插件的加载、管理、启用/禁用等功能
+ */
+class PluginManager {
     private plugins: Plugin[] = [];
-    private ee = new EventEmitter();
+    private eventEmitter = new EventEmitter();
 
-    constructor() {
-        Plugin.injectDependencies(this);
-    }
-
-    async setup(): Promise<void> {
+    /**
+     * 初始化插件管理器，从文件系统加载所有插件
+     */
+    async setup() {
         try {
-            const pluginBasePath = '/storage/emulated/0/Android/data/com.cymusic/files/plugins';
-
-            // 确保插件目录存在
-            if (!(await exists(pluginBasePath))) {
-                await mkdir(pluginBasePath, { NSURLIsExcludedFromBackupKey: true });
-            }
-
-            const allPlugins: Plugin[] = [];
-            const pluginsFileItems = await readdir(pluginBasePath);
+            await pluginMeta.migratePluginMeta();
+            // 加载插件
+            const { platformFS } = await import('./platformAdapter');
+            const pluginsFileItems = await platformFS.readDir(pathConst.pluginPath);
+            const allPlugins: Array<Plugin> = [];
 
             for (let i = 0; i < pluginsFileItems.length; ++i) {
                 const pluginFileItem = pluginsFileItems[i];
-                trace('初始化插件', pluginFileItem);
-
-                const pluginPath = `${pluginBasePath}/${pluginFileItem}`;
-                if (pluginFileItem.endsWith('.js')) {
-                    const funcCode = await readFile(pluginPath, 'utf8');
-                    const plugin = new Plugin(funcCode, pluginPath);
+                console.log('初始化插件', pluginFileItem);
+                if (
+                    pluginFileItem.isFile() &&
+                    (pluginFileItem.name?.endsWith?.('.js') ||
+                        pluginFileItem.path?.endsWith?.('.js'))
+                ) {
+                    const funcCode = await platformFS.readFile(pluginFileItem.path, 'utf8');
+                    const plugin = new Plugin(funcCode, pluginFileItem.path);
 
                     const _pluginIndex = allPlugins.findIndex(
                         p => p.hash === plugin.hash,
@@ -87,7 +40,7 @@ class PluginManagerImpl implements IPluginManager {
                         // 重复插件，直接忽略
                         continue;
                     }
-                    if (plugin.state === PluginState.Mounted) {
+                    if (plugin.state === 'mounted') {
                         allPlugins.push(plugin);
                     }
                 }
@@ -95,223 +48,80 @@ class PluginManagerImpl implements IPluginManager {
 
             this.setPlugins(allPlugins);
         } catch (e: any) {
-            ToastAndroid.show(
-                `插件初始化失败:${e?.message ?? e}`,
-                ToastAndroid.LONG,
-            );
-            errorLog('插件初始化失败', e?.message);
+            console.error(`插件初始化失败:${e?.message ?? e}`);
             throw e;
         }
     }
 
-    async installPluginFromLocalFile(
-        pluginPath: string,
-        config?: IInstallPluginConfig & { useExpoFs?: boolean }
-    ): Promise<IInstallPluginResult> {
-        let funcCode: string;
-        if (config?.useExpoFs) {
-            funcCode = await readAsStringAsync(pluginPath);
-        } else {
-            funcCode = await readFile(pluginPath, 'utf8');
-        }
-
-        if (funcCode) {
-            const plugin = new Plugin(funcCode, pluginPath);
-            let allPlugins = [...this.getPlugins()];
-
-            const _pluginIndex = allPlugins.findIndex(p => p.hash === plugin.hash);
-            if (_pluginIndex !== -1) {
-                return {
-                    success: true,
-                    message: '插件已安装',
-                    pluginName: plugin.name,
-                    pluginHash: plugin.hash,
-                };
-            }
-
-            const oldVersionPlugin = allPlugins.find(p => p.name === plugin.name);
-            if (oldVersionPlugin && !config?.notCheckVersion) {
-                if (
-                    compare(
-                        oldVersionPlugin.instance.version ?? '',
-                        plugin.instance.version ?? '',
-                        '>',
-                    )
-                ) {
-                    return {
-                        success: false,
-                        message: '已安装更新版本的插件',
-                        pluginName: plugin.name,
-                        pluginHash: plugin.hash,
-                    };
-                }
-            }
-
-            if (oldVersionPlugin) {
-                allPlugins = allPlugins.filter(p => p.name !== plugin.name);
-            }
-
-            if (plugin.state === PluginState.Mounted) {
-                allPlugins.push(plugin);
-                this.setPlugins(allPlugins);
-                return {
-                    success: true,
-                    message: '插件安装成功',
-                    pluginName: plugin.name,
-                    pluginHash: plugin.hash,
-                };
-            } else {
-                return {
-                    success: false,
-                    message: '插件安装失败',
-                    pluginName: plugin.name,
-                    pluginHash: plugin.hash,
-                };
-            }
-        }
-
-        throw new Error('无法读取插件文件');
+    /**
+     * 设置插件列表
+     */
+    setPlugins(plugins: Plugin[]) {
+        this.plugins = plugins;
+        this.eventEmitter.emit('plugins-updated', plugins);
     }
 
-    async installPluginFromUrl(
-        url: string,
-        config?: IInstallPluginConfig
-    ): Promise<IInstallPluginResult> {
-        try {
-            const funcCode = (
-                await axios.get(url, {
-                    headers: {
-                        'Cache-Control': 'no-cache',
-                        Pragma: 'no-cache',
-                        Expires: '0',
-                    },
-                })
-            ).data;
-
-            if (funcCode) {
-                const plugin = new Plugin(funcCode, '');
-                let allPlugins = [...this.getPlugins()];
-                const pluginIndex = allPlugins.findIndex(p => p.hash === plugin.hash);
-
-                if (pluginIndex !== -1) {
-                    return {
-                        success: true,
-                        message: '插件已安装',
-                        pluginName: plugin.name,
-                        pluginHash: plugin.hash,
-                        pluginUrl: url,
-                    };
-                }
-
-                const oldVersionPlugin = allPlugins.find(p => p.name === plugin.name);
-                if (oldVersionPlugin && !config?.notCheckVersion) {
-                    if (
-                        compare(
-                            oldVersionPlugin.instance.version ?? '',
-                            plugin.instance.version ?? '',
-                            '>',
-                        )
-                    ) {
-                        return {
-                            success: false,
-                            message: '已安装更新版本的插件',
-                            pluginName: plugin.name,
-                            pluginHash: plugin.hash,
-                            pluginUrl: url,
-                        };
-                    }
-                }
-
-                if (oldVersionPlugin) {
-                    allPlugins = allPlugins.filter(p => p.name !== plugin.name);
-                }
-
-                if (plugin.state === PluginState.Mounted) {
-                    allPlugins.push(plugin);
-                    this.setPlugins(allPlugins);
-                    return {
-                        success: true,
-                        message: '插件安装成功',
-                        pluginName: plugin.name,
-                        pluginHash: plugin.hash,
-                        pluginUrl: url,
-                    };
-                } else {
-                    return {
-                        success: false,
-                        message: '插件安装失败',
-                        pluginName: plugin.name,
-                        pluginHash: plugin.hash,
-                        pluginUrl: url,
-                    };
-                }
-            }
-        } catch (e: any) {
-            throw new Error(`插件安装失败: ${e?.message ?? e}`);
-        }
-
-        throw new Error('无法下载插件');
-    }
-
-    async uninstallPlugin(hash: string): Promise<void> {
-        const allPlugins = this.getPlugins().filter(p => p.hash !== hash);
-        this.setPlugins(allPlugins);
-    }
-
-    async uninstallAllPlugins(): Promise<void> {
-        this.setPlugins([]);
-    }
-
-    async updatePlugin(plugin: Plugin): Promise<void> {
-        const updateUrl = plugin.instance.srcUrl;
-        if (!updateUrl) {
-            throw new Error('没有更新源');
-        }
-        try {
-            await this.installPluginFromUrl(updateUrl);
-        } catch (e: any) {
-            if (e.message === '插件已安装') {
-                throw new Error('当前已是最新版本');
-            } else {
-                throw e;
-            }
-        }
-    }
-
-    getByMedia(mediaItem: ICommon.IMediaBase): Plugin | undefined {
-        return this.getByName(mediaItem?.platform);
-    }
-
-    getByName(name: string): Plugin | undefined {
-        return name === localPluginPlatform
-            ? localFilePlugin
-            : this.getPlugins().find(_ => _.name === name);
-    }
-
-    getByHash(hash: string): Plugin | undefined {
-        return hash === localPluginHash
-            ? localFilePlugin
-            : this.getPlugins().find(_ => _.hash === hash);
-    }
-
-    getPlugins(): Plugin[] {
+    /**
+     * 获取所有插件
+     */
+    getPlugins() {
         return this.plugins;
     }
 
-    getValidPlugins(): Plugin[] {
-        return this.plugins.filter(p => p.state === PluginState.Mounted);
+    /**
+     * 通过名称获取插件
+     */
+    getByName(name: string) {
+        return this.getPlugins().find(_ => _.name === name);
     }
 
-    getPluginsWithAbility(ability: keyof IPlugin.IPluginInstanceMethods): Plugin[] {
-        return this.getValidPlugins().filter(
-            plugin =>
-                this.isPluginEnabled(plugin) &&
-                typeof plugin.instance[ability] === 'function'
+    /**
+     * 通过哈希值获取插件
+     */
+    getByHash(hash: string) {
+        return this.getPlugins().find(_ => _.hash === hash);
+    }
+
+    /**
+     * 通过媒体项的平台信息获取对应的插件
+     */
+    getByMedia(mediaItem: ICommon.IMediaBase) {
+        return this.getByName(mediaItem?.platform);
+    }
+
+    /**
+     * 获取所有已启用的插件
+     */
+    getEnabledPlugins() {
+        return this.getPlugins().filter(it => pluginMeta.isPluginEnabled(it.name));
+    }
+
+    /**
+     * 获取按顺序排序的所有插件
+     */
+    getSortedPlugins() {
+        const order = pluginMeta.getPluginOrder();
+        return [...this.getPlugins()].sort((a, b) =>
+            (order[a.name] ?? Infinity) - (order[b.name] ?? Infinity) < 0
+                ? -1
+                : 1,
         );
     }
 
-    getSortedPluginsWithAbility(ability: keyof IPlugin.IPluginInstanceMethods): Plugin[] {
-        const order = pluginMeta.getPluginOrderSync();
+    /**
+     * 获取所有实现特定功能的插件
+     */
+    getPluginsWithAbility(ability: string) {
+        return this.getEnabledPlugins().filter(
+            plugin => typeof (plugin.instance as any)[ability] === 'function',
+        );
+    }
+
+    /**
+     * 获取所有实现特定功能的已启用插件，并按顺序排序
+     */
+    getSortedPluginsWithAbility(ability: string) {
+        const order = pluginMeta.getPluginOrder();
         return [...this.getPluginsWithAbility(ability)].sort((a, b) =>
             (order[a.name] ?? Infinity) - (order[b.name] ?? Infinity) < 0
                 ? -1
@@ -319,20 +129,93 @@ class PluginManagerImpl implements IPluginManager {
         );
     }
 
-    setPluginEnabled(plugin: Plugin, enabled: boolean): void {
-        this.ee.emit('enabled-updated', plugin.name, enabled);
-        pluginMeta.setPluginEnabledSync(plugin.name, enabled);
+    /**
+     * 设置插件的启用状态
+     */
+    setPluginEnabled(plugin: Plugin, enabled: boolean) {
+        this.eventEmitter.emit('enabled-updated', plugin.name, enabled);
+        pluginMeta.setPluginEnabled(plugin.name, enabled);
     }
 
-    isPluginEnabled(plugin: Plugin): boolean {
-        return pluginMeta.isPluginEnabledSync(plugin.name);
+    /**
+     * 检查插件是否已启用
+     */
+    isPluginEnabled(plugin: Plugin) {
+        return pluginMeta.isPluginEnabled(plugin.name);
     }
 
-    setPlugins(plugins: Plugin[]): void {
-        this.plugins = plugins;
-        this.ee.emit('plugins-updated', plugins);
+    /**
+     * 监听插件事件
+     */
+    on(event: string, listener: (...args: any[]) => void) {
+        this.eventEmitter.on(event, listener);
+    }
+
+    /**
+     * 移除事件监听器
+     */
+    off(event: string, listener: (...args: any[]) => void) {
+        this.eventEmitter.off(event, listener);
     }
 }
 
-export const PluginManager = new PluginManagerImpl();
-export default PluginManager;
+// 创建单例实例
+const pluginManager = new PluginManager();
+
+/**
+ * 插件系统启动函数
+ */
+export async function bootstrap() {
+    console.log('插件系统启动中...');
+
+    try {
+        // 创建测试插件
+        const testPlugin = `
+            module.exports = {
+                platform: "测试插件",
+                appVersion: ">=0.1.0",
+                async search(query, page = 1, type = 'music') {
+                    return {
+                        isEnd: true,
+                        data: [{
+                            id: 'test-1',
+                            title: '测试歌曲',
+                            artist: '测试艺术家',
+                            type: 'music'
+                        }]
+                    };
+                },
+                async getTopLists() {
+                    return [{
+                        title: '测试排行榜',
+                        data: [{
+                            id: 'test-toplist-1',
+                            title: '测试排行榜',
+                            description: '这是一个测试排行榜'
+                        }]
+                    }];
+                },
+                async getRecommendSheetTags() {
+                    return {
+                        pinned: [{
+                            id: 'test-sheet-1',
+                            title: '测试歌单',
+                            description: '这是一个测试歌单'
+                        }],
+                        data: []
+                    };
+                }
+            };
+        `;
+
+        const testPluginInstance = new Plugin(testPlugin, 'test-plugin.js');
+        pluginManager.setPlugins([testPluginInstance]);
+
+        console.log('插件系统启动完成，已加载测试插件');
+    } catch (error) {
+        console.error('插件系统启动失败:', error);
+        throw error;
+    }
+}
+
+export default pluginManager;
