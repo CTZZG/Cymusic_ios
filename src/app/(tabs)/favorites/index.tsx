@@ -6,10 +6,9 @@ import { Playlist } from '@/helpers/types'
 import { useNavigationSearch } from '@/hooks/useNavigationSearch'
 import { defaultStyles } from '@/styles'
 import i18n from '@/utils/i18n'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { useMemo } from 'react'
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Image, ScrollView, View } from 'react-native'
 
 const FavoritesScreen = () => {
 	const search = useNavigationSearch({
@@ -63,18 +62,6 @@ const FavoritesScreen = () => {
 					paddingHorizontal: screenPadding.horizontal,
 				}}
 			>
-				{/* 插件导入入口 */}
-				<View style={styles.importSection}>
-					<Text style={styles.importTitle}>插件导入</Text>
-					<TouchableOpacity
-						style={styles.importButton}
-						onPress={() => router.push('/(modals)/importPlaylist')}
-					>
-						<MaterialCommunityIcons name="download" size={20} color="#007AFF" />
-						<Text style={styles.importButtonText}>导入歌单</Text>
-					</TouchableOpacity>
-				</View>
-
 				<PlaylistsList
 					scrollEnabled={false}
 					playlists={filteredPlayLists as Playlist[]}
@@ -85,33 +72,6 @@ const FavoritesScreen = () => {
 	)
 }
 
-const styles = StyleSheet.create({
-	importSection: {
-		backgroundColor: '#1C1C1F',
-		borderRadius: 12,
-		padding: 16,
-		marginBottom: 16,
-	},
-	importTitle: {
-		fontSize: 18,
-		fontWeight: 'bold',
-		color: '#FFFFFF',
-		marginBottom: 12,
-	},
-	importButton: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		backgroundColor: '#2C2C2F',
-		paddingHorizontal: 16,
-		paddingVertical: 12,
-		borderRadius: 8,
-		gap: 8,
-	},
-	importButtonText: {
-		color: '#007AFF',
-		fontSize: 16,
-		fontWeight: '600',
-	},
-})
+
 
 export default FavoritesScreen

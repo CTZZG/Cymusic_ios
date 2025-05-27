@@ -22,10 +22,27 @@ const RecommendSheetsScreen = () => {
 	const loadRecommendSheets = useCallback(async () => {
 		try {
 			setIsLoading(true)
+			console.log('开始加载推荐歌单...')
 			const result = await pluginRecommendService.getAllRecommendSheetTags()
+			console.log('推荐歌单加载结果:', result)
 			setRecommendData(result)
 		} catch (error) {
 			console.error('加载推荐歌单失败:', error)
+			// 设置默认数据以避免黑屏
+			setRecommendData({
+				pinned: [],
+				data: [{
+					title: '测试分类',
+					data: [{
+						id: 'test-1',
+						title: '测试歌单',
+						description: '这是一个测试歌单',
+						coverImg: 'https://via.placeholder.com/120x120?text=测试',
+						platform: '测试插件',
+						playCount: '1000'
+					}]
+				}]
+			})
 		} finally {
 			setIsLoading(false)
 		}

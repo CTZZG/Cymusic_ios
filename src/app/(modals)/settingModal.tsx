@@ -440,7 +440,8 @@ const SettingModal = () => {
 				{ id: '5', title: i18n.t('settings.items.projectLink'), type: 'value', value: '' },
 				{ id: '9', title: i18n.t('settings.items.clearCache'), type: 'value', value: '' },
 				{ id: '13', title: i18n.t('settings.items.viewLogs'), type: 'link' },
-				{ id: '18', title: '插件系统测试', type: 'link' },
+				{ id: '18', title: '插件管理', type: 'link' },
+				{ id: '19', title: '导入中心', type: 'link' },
 				{
 					id: '15',
 					title: i18n.t('settings.items.changeLanguage'),
@@ -700,8 +701,10 @@ const SettingModal = () => {
 				onPress={() => {
 					if (item.title === i18n.t('settings.items.viewLogs')) {
 						router.push('/(modals)/logScreen')
-					} else if (item.title === '插件系统测试') {
-						router.push('/(modals)/pluginTest')
+					} else if (item.title === '插件管理') {
+						router.push('/(modals)/pluginManager')
+					} else if (item.title === '导入中心') {
+						router.push('/(modals)/importCenter')
 					}
 					if (item.title === i18n.t('settings.items.projectLink')) {
 						Linking.openURL('https://github.com/gyc-12/Cymusic').catch((err) =>
