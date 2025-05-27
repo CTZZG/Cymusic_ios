@@ -241,6 +241,15 @@ const RootNavigation = () => {
 					gestureDirection: 'vertical',
 				}}
 			/>
+			<Stack.Screen
+				name="(modals)/pluginManage"
+				options={{
+					presentation: 'modal',
+					headerShown: false,
+					gestureEnabled: true,
+					gestureDirection: 'vertical',
+				}}
+			/>
 		</Stack>
 	)
 }

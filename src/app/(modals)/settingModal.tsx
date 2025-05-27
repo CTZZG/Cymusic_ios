@@ -488,7 +488,10 @@ const SettingModal = () => {
 		},
 		{
 			title: '插件系统',
-			data: [{ id: '18', title: '插件系统测试', type: 'link' }],
+			data: [
+				{ id: '20', title: '插件管理', type: 'link' },
+				{ id: '18', title: '插件系统测试', type: 'link' }
+			],
 		},
 		{
 			title: 'UI组件',
@@ -710,6 +713,8 @@ const SettingModal = () => {
 						router.push('/(modals)/pluginTest')
 					} else if (item.title === 'UI组件测试') {
 						router.push('/(modals)/uiTest')
+					} else if (item.title === '插件管理') {
+						router.push('/(modals)/pluginManage')
 					}
 					if (item.title === i18n.t('settings.items.projectLink')) {
 						Linking.openURL('https://github.com/gyc-12/Cymusic').catch((err) =>

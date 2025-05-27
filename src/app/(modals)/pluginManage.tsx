@@ -1,21 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import * as DocumentPicker from 'expo-document-picker';
-import { useColors } from '@/hooks/useColors';
-import { rpx } from '@/constants/uiConst';
-import ThemeText from '@/components/base/ThemeText';
-import IconButton from '@/components/base/IconButton';
-import Icon from '@/components/base/Icon';
 import { Button } from '@/components/base/Button';
-import { useNavigate } from '@/core/router/useNavigate';
+import Icon from '@/components/base/Icon';
+import IconButton from '@/components/base/IconButton';
+import ThemeText from '@/components/base/ThemeText';
+import PluginItem from '@/components/plugin/PluginItem';
+import { rpx } from '@/constants/uiConst';
 import { PluginManager } from '@/core/pluginManager';
 import { Plugin } from '@/core/pluginManager/plugin';
-import PluginItem from '@/components/plugin/PluginItem';
+import { useColors } from '@/hooks/useColors';
+import * as DocumentPicker from 'expo-document-picker';
+import { router } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-export default function PluginManagePage() {
+export default function PluginManageScreen() {
     const colors = useColors();
-    const { goBack } = useNavigate();
+    const goBack = () => router.back();
     const [plugins, setPlugins] = useState<Plugin[]>([]);
     const [loading, setLoading] = useState(false);
     const [showInstallDialog, setShowInstallDialog] = useState(false);
