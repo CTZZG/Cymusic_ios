@@ -493,10 +493,7 @@ const SettingModal = () => {
 				{ id: '18', title: '插件系统测试', type: 'link' }
 			],
 		},
-		{
-			title: 'UI组件',
-			data: [{ id: '19', title: 'UI组件测试', type: 'link' }],
-		},
+
 	]
 	const importMusicSourceMenu = (
 		<MenuView
@@ -711,8 +708,6 @@ const SettingModal = () => {
 						router.push('/(modals)/logScreen')
 					} else if (item.title === '插件系统测试') {
 						router.push('/(modals)/pluginTest')
-					} else if (item.title === 'UI组件测试') {
-						router.push('/(modals)/uiTest')
 					} else if (item.title === '插件管理') {
 						router.push('/(modals)/pluginManage')
 					}
